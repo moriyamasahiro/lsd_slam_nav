@@ -2,7 +2,7 @@
 * This file is part of LSD-SLAM.
 *
 * Copyright 2013 Jakob Engel <engelj at in dot tum dot de> (Technical University of Munich)
-* For more information see <http://vision.in.tum.de/lsdslam> 
+* For more information see <http://vision.in.tum.de/lsdslam>
 *
 * LSD-SLAM is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ public:
 
 	// set initially as tracking result (then it's a SE(3)),
 	// and is changed only once, when the frame becomes a KF (->rescale).
-	Sim3 thisToParent_raw;
+	SE3 thisToParent_raw;
 
 
 	int frameID;
@@ -56,11 +56,11 @@ public:
 	bool isInGraph;
 
 	// graphVertex (if the frame has one, i.e. is a KF and has been added to the graph, otherwise 0).
-	VertexSim3* graphVertex;
+	VertexSE3* graphVertex;
 
-	void setPoseGraphOptResult(Sim3 camToWorld);
+	void setPoseGraphOptResult(SE3 camToWorld);
 	void applyPoseGraphOptResult();
-	Sim3 getCamToWorld(int recursionDepth = 0);
+    SE3 getCamToWorld(int recursionDepth = 0);
 	void invalidateCache();
 private:
 	int cacheValidFor;
@@ -68,10 +68,10 @@ private:
 
 	// absolute position (camToWorld).
 	// can change when optimization offset is merged.
-	Sim3 camToWorld;
+	SE3 camToWorld;
 
 	// new, optimized absolute position. is added on mergeOptimization.
-	Sim3 camToWorld_new;
+	SE3 camToWorld_new;
 
 	// whether camToWorld_new is newer than camToWorld
 	bool hasUnmergedPose;

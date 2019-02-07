@@ -2,7 +2,7 @@
 * This file is part of LSD-SLAM.
 *
 * Copyright 2013 Jakob Engel <engelj at in dot tum dot de> (Technical University of Munich)
-* For more information see <http://vision.in.tum.de/lsdslam> 
+* For more information see <http://vision.in.tum.de/lsdslam>
 *
 * LSD-SLAM is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -81,7 +81,7 @@ void ROSOutput3DWrapper::publishKeyframe(Frame* f)
 	int w = f->width(publishLvl);
 	int h = f->height(publishLvl);
 
-	memcpy(fMsg.camToWorld.data(),f->getScaledCamToWorld().cast<float>().data(),sizeof(float)*7);
+	memcpy(fMsg.camToWorld.data(),f->getCamToWorld().cast<float>().data(),sizeof(float)*6);
 	fMsg.fx = f->fx(publishLvl);
 	fMsg.fy = f->fy(publishLvl);
 	fMsg.cx = f->cx(publishLvl);
@@ -121,7 +121,7 @@ void ROSOutput3DWrapper::publishTrackedFrame(Frame* kf)
 	fMsg.isKeyframe = false;
 
 
-	memcpy(fMsg.camToWorld.data(),kf->getScaledCamToWorld().cast<float>().data(),sizeof(float)*7);
+	memcpy(fMsg.camToWorld.data(),kf->getCamToWorld().cast<float>().data(),sizeof(float)*6);
 	fMsg.fx = kf->fx(publishLvl);
 	fMsg.fy = kf->fy(publishLvl);
 	fMsg.cx = kf->cx(publishLvl);
@@ -134,7 +134,7 @@ void ROSOutput3DWrapper::publishTrackedFrame(Frame* kf)
 	liveframe_publisher.publish(fMsg);
 
 
-	SE3 camToWorld = se3FromSim3(kf->getScaledCamToWorld());
+	SE3 camToWorld = kf->getCamToWorld();
 
 	geometry_msgs::PoseStamped pMsg;
 
@@ -173,7 +173,7 @@ void ROSOutput3DWrapper::publishKeyframeGraph(KeyFrameGraph* graph)
 	{
 		constraintData[i].from = graph->edgesAll[i]->firstFrame->id();
 		constraintData[i].to = graph->edgesAll[i]->secondFrame->id();
-		Sophus::Vector7d err = graph->edgesAll[i]->edge->error();
+		Sophus::Vector6d err = graph->edgesAll[i]->edge->error();
 		constraintData[i].err = sqrt(err.dot(err));
 	}
 	graph->edgesListsMutex.unlock();
@@ -185,7 +185,7 @@ void ROSOutput3DWrapper::publishKeyframeGraph(KeyFrameGraph* graph)
 	for(unsigned int i=0;i<graph->keyframesAll.size();i++)
 	{
 		framePoseData[i].id = graph->keyframesAll[i]->id();
-		memcpy(framePoseData[i].camToWorld, graph->keyframesAll[i]->getScaledCamToWorld().cast<float>().data(),sizeof(float)*7);
+		memcpy(framePoseData[i].camToWorld, graph->keyframesAll[i]->getCamToWorld().cast<float>().data(),sizeof(float)*6);
 	}
 	graph->keyframesAllMutex.unlock_shared();
 

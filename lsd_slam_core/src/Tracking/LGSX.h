@@ -442,6 +442,36 @@ public:
   }
 };
 
+class LGS7_KF
+{
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
+  Matrix6x6 A;
+  Vector6 b;
+
+  float error;
+  size_t num_constraints;
+
+  void initializeFrom(const LGS6& ls6, const LGS4& ls4)
+  {
+  	// add ls6
+  	A = ls6.A;
+  	b = ls6.b;
+
+  	// add ls4
+  	int remap[4] = {2,3,4,6};
+  	for(int i=0;i<3;i++)
+  	{
+  		b[remap[i]] += ls4.b[i];
+  		for(int j=0;j<3;j++)
+  			A(remap[i], remap[j]) += ls4.A(i,j);
+  	}
+
+  	num_constraints = ls6.num_constraints + ls4.num_constraints;
+  }
+};
+
 
 
 }

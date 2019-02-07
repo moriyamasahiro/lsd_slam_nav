@@ -41,6 +41,7 @@ namespace lsd_slam
 class SlamSystem;
 class LiveSLAMWrapperROS;
 class InputImageStream;
+class InputGNSSStream;
 class Output3DWrapper;
 
 
@@ -50,7 +51,7 @@ friend class LiveSLAMWrapperROS;
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-	LiveSLAMWrapper(InputImageStream* imageStream, Output3DWrapper* outputWrapper);
+	LiveSLAMWrapper(InputImageStream* imageStream, InputGNSSStream* GNSSStream, Output3DWrapper* outputWrapper);
 
 	/** Destructor. */
 	~LiveSLAMWrapper();
@@ -67,6 +68,9 @@ public:
 
 	/** Callback function for new RGB images. */
 	void newImageCallback(const cv::Mat& img, Timestamp imgTime);
+	
+	/** Callback function for new RGB and Depth images. */
+	void newImageCallback(const cv::Mat& img, const cv::Matx<float,352,640>& depth, Timestamp imgTime);
 
 	/** Writes the given time and pose to the outFile. */
 	void logCameraPose(const SE3& camToWorld, double time);
@@ -77,6 +81,7 @@ public:
 private:
 	
 	InputImageStream* imageStream;
+    InputGNSSStream* GNSSStream;
 	Output3DWrapper* outputWrapper;
 
 	// initialization stuff

@@ -19,13 +19,26 @@ find_package(catkin REQUIRED COMPONENTS
   rosbag
   cmake_modules
   lsd_slam_viewer
+  roslang
+  message_filters
 )
+
+find_package(Qt5Core REQUIRED)
+find_package(Qt5Gui REQUIRED)
+find_package(Qt5Widgets REQUIRED)
+find_package(Qt5Test REQUIRED)
+find_package(Qt5Concurrent REQUIRED)
+find_package(Qt5OpenGL REQUIRED)
+
+#set(CMAKE_PREFIX_PATH "/home/mmasahiro/github/opencv-2.4.13")
+#find_package(OpenCV 2.4 REQUIRED)
+#set(OpenCV_INCLUDE_DIRS "/home/mmasahiro/github/opencv-2.4.13/include")
+#set(OpenCV_INCLUDE_DIRS "/usr/local/include/opencv2")
 
 find_package(Eigen3 REQUIRED)
 find_package(X11 REQUIRED)
 include(cmake/FindG2O.cmake)
 include(cmake/FindSuiteParse.cmake)
-
 
 message("-- CHOLMOD_INCLUDE_DIR : " ${CHOLMOD_INCLUDE_DIR})
 message("-- CSPARSE_INCLUDE_DIR : " ${CSPARSE_INCLUDE_DIR})
@@ -33,10 +46,10 @@ message("-- G2O_INCLUDE_DIR : " ${G2O_INCLUDE_DIR})
 
 # FabMap
 # uncomment this part to enable fabmap
-#add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/openFabMap)
-#include_directories(${PROJECT_SOURCE_DIR}/thirdparty/openFabMap/include)
-#add_definitions("-DHAVE_FABMAP")
-#set(FABMAP_LIB openFABMAP )
+add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/openFabMap)
+include_directories(${PROJECT_SOURCE_DIR}/thirdparty/openFabMap/include)
+add_definitions("-DHAVE_FABMAP")
+set(FABMAP_LIB openFABMAP )
 
 generate_dynamic_reconfigure_options(
   cfg/LSDDebugParams.cfg
@@ -71,7 +84,7 @@ set(lsd_SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/util/SophusUtil.cpp
   ${PROJECT_SOURCE_DIR}/src/util/settings.cpp
   ${PROJECT_SOURCE_DIR}/src/util/Undistorter.cpp
-  ${PROJECT_SOURCE_DIR}/src/Tracking/Sim3Tracker.cpp
+  ${PROJECT_SOURCE_DIR}/src/Tracking/SE3KFTracker.cpp
   ${PROJECT_SOURCE_DIR}/src/Tracking/Relocalizer.cpp
   ${PROJECT_SOURCE_DIR}/src/Tracking/SE3Tracker.cpp
   ${PROJECT_SOURCE_DIR}/src/Tracking/TrackingReference.cpp
@@ -84,6 +97,7 @@ set(lsd_SOURCE_FILES
 set(SOURCE_FILES
   ${lsd_SOURCE_FILES}
   ${PROJECT_SOURCE_DIR}/src/IOWrapper/ROS/ROSImageStreamThread.cpp
+  ${PROJECT_SOURCE_DIR}/src/IOWrapper/ROS/ROSGNSSStreamThread.cpp
   ${PROJECT_SOURCE_DIR}/src/IOWrapper/ROS/ROSOutput3DWrapper.cpp
   ${PROJECT_SOURCE_DIR}/src/IOWrapper/OpenCV/ImageDisplay_OpenCV.cpp
 )
@@ -93,6 +107,7 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
   ${PROJECT_SOURCE_DIR}/src
   ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
+  #${PROJECT_SOURCE_DIR}/thirdparty/opencv_contribe/modules/xfeatures2d/includes
   ${CSPARSE_INCLUDE_DIR} #Has been set by SuiteParse
   ${CHOLMOD_INCLUDE_DIR} #Has been set by SuiteParse
   ${OpenCV_INCLUDE_DIRS}

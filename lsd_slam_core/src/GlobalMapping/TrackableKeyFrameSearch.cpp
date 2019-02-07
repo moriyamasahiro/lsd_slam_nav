@@ -2,7 +2,7 @@
 * This file is part of LSD-SLAM.
 *
 * Copyright 2013 Jakob Engel <engelj at in dot tum dot de> (Technical University of Munich)
-* For more information see <http://vision.in.tum.de/lsdslam> 
+* For more information see <http://vision.in.tum.de/lsdslam>
 *
 * LSD-SLAM is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -60,35 +60,35 @@ std::vector<TrackableKFStruct, Eigen::aligned_allocator<TrackableKFStruct> > Tra
 	float cosAngleTH = cosf(angleTH*0.5f*(fowX + fowY));
 
 
-	Eigen::Vector3d pos = frame->getScaledCamToWorld().translation();
-	Eigen::Vector3d viewingDir = frame->getScaledCamToWorld().rotationMatrix().rightCols<1>();
+	Eigen::Vector3d pos = frame->getCamToWorld().translation();
+	Eigen::Vector3d viewingDir = frame->getCamToWorld().rotationMatrix().rightCols<1>();
 
 	std::vector<TrackableKFStruct, Eigen::aligned_allocator<TrackableKFStruct> > potentialReferenceFrames;
 
 	float distFacReciprocal = 1;
 	if(checkBothScales)
-		distFacReciprocal = frame->meanIdepth / frame->getScaledCamToWorld().scale();
+		distFacReciprocal = frame->meanIdepth;
 
 	// for each frame, calculate the rough score, consisting of pose, scale and angle overlap.
 	graph->keyframesAllMutex.lock_shared();
 	for(unsigned int i=0;i<graph->keyframesAll.size();i++)
 	{
-		Eigen::Vector3d otherPos = graph->keyframesAll[i]->getScaledCamToWorld().translation();
+		Eigen::Vector3d otherPos = graph->keyframesAll[i]->getCamToWorld().translation();
 
 		// get distance between the frames, scaled to fit the potential reference frame.
-		float distFac = graph->keyframesAll[i]->meanIdepth / graph->keyframesAll[i]->getScaledCamToWorld().scale();
+		float distFac = graph->keyframesAll[i]->meanIdepth ;
 		if(checkBothScales && distFacReciprocal < distFac) distFac = distFacReciprocal;
 		Eigen::Vector3d dist = (pos - otherPos) * distFac;
 		float dNorm2 = dist.dot(dist);
 		if(dNorm2 > distanceTH) continue;
 
-		Eigen::Vector3d otherViewingDir = graph->keyframesAll[i]->getScaledCamToWorld().rotationMatrix().rightCols<1>();
+		Eigen::Vector3d otherViewingDir = graph->keyframesAll[i]->getCamToWorld().rotationMatrix().rightCols<1>();
 		float dirDotProd = otherViewingDir.dot(viewingDir);
 		if(dirDotProd < cosAngleTH) continue;
 
 		potentialReferenceFrames.push_back(TrackableKFStruct());
 		potentialReferenceFrames.back().ref = graph->keyframesAll[i];
-		potentialReferenceFrames.back().refToFrame = se3FromSim3(graph->keyframesAll[i]->getScaledCamToWorld().inverse() * frame->getScaledCamToWorld()).inverse();
+		potentialReferenceFrames.back().refToFrame = (graph->keyframesAll[i]->getCamToWorld().inverse() * frame->getCamToWorld()).inverse();
 		potentialReferenceFrames.back().dist = dNorm2;
 		potentialReferenceFrames.back().angle = dirDotProd;
 	}
@@ -213,13 +213,13 @@ Frame* TrackableKeyFrameSearch::findAppearanceBasedCandidate(Frame* keyframe)
 		printf("Error: called findAppearanceBasedCandidate(), but FabMap instance is not valid!\n");
 		return nullptr;
 	}
-	
+
 
 	int newID, loopID;
 	fabMap.compareAndAdd(keyframe, &newID, &loopID);
 	if (newID < 0)
 		return nullptr;
-	
+
 	fabmapIDToKeyframe.insert(std::make_pair(newID, keyframe));
 	if (loopID >= 0)
 		return fabmapIDToKeyframe.at(loopID);

@@ -2,7 +2,7 @@
 * This file is part of LSD-SLAM.
 *
 * Copyright 2013 Jakob Engel <engelj at in dot tum dot de> (Technical University of Munich)
-* For more information see <http://vision.in.tum.de/lsdslam> 
+* For more information see <http://vision.in.tum.de/lsdslam>
 *
 * LSD-SLAM is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -35,8 +35,8 @@ namespace lsd_slam
 
 class Frame;
 class KeyFrameGraph;
-class VertexSim3;
-class EdgeSim3;
+class VertexSE3;
+class EdgeSE3;
 class FramePoseStruct;
 
 struct KFConstraintStruct
@@ -62,10 +62,10 @@ struct KFConstraintStruct
 
 	Frame* firstFrame;
 	Frame* secondFrame;
-	Sophus::Sim3d secondToFirst;
-	Eigen::Matrix<double, 7, 7> information;
+	Sophus::SE3d secondToFirst;
+	Eigen::Matrix<double, 6, 6> information;
 	g2o::RobustKernel* robustKernel;
-	EdgeSim3* edge;
+	EdgeSE3* edge;
 
 	float usage;
 	float meanResidualD;
@@ -77,6 +77,101 @@ struct KFConstraintStruct
 	int idxInAllEdges;
 };
 
+struct GNSSConstraintStruct
+{
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+	inline GNSSConstraintStruct()
+	{
+		information.setZero();
+		robustKernel = 0;
+		edgeFromWorld = 0;
+		edgeFromVehicle = 0;
+		graph_added = true;
+		timestamp = 0;
+
+
+		idxInAllEdges = -1;
+	}
+
+	~GNSSConstraintStruct();
+	
+	inline void set_positioning(double positioning[3])
+	{
+	    longitude = positioning[0];
+	    latitude  = positioning[1];
+	    altitude  = positioning[2];
+	}
+	
+	inline void set_positioning(double lat, double lon, double alt)
+	{
+	    longitude = lon;
+	    latitude  = lat;
+	    altitude  = alt;
+	}
+	
+	inline void set_edgeFromWorld(double enu[3])
+	{
+		Eigen::Matrix<float, 6, 1> pose;
+		pose << enu[0], enu[1], enu[2], 0., 0., 0.;
+		vehicleToWorld = SE3::exp(pose.cast<sophusType>());
+	}
+	
+	inline void set_information(double variance[3])
+	{
+	    information <<
+		    variance[0],0.,0.,0.,0.,0.,
+		    0.,variance[1],0.,0.,0.,0.,
+		    0.,0.,variance[2],0.,0.,0.,
+		    0.,0.,0.,9999,0.,0.,
+		    0.,0.,0.,0.,9999,0.,
+		    0.,0.,0.,0.,0.,9999;
+	}
+	
+	inline void set_information()
+	{
+		information <<
+			0.001,0.,0.,0.,0.,0.,
+			0.,0.001,0.,0.,0.,0.,
+			0.,0.,0.001,0.,0.,0.,
+			0.,0.,0.,0.001,0.,0.,
+			0.,0.,0.,0.,0.001,0.,
+			0.,0.,0.,0.,0.,0.001;
+	}
+	
+	inline void set_id(int id)
+	{
+		idInGNSSVertices=id; 
+	}
+
+    VertexSE3* worldVertex;
+    VertexSE3* vehicleVertex;
+
+	Sophus::SE3d vehicleToWorld;
+	Eigen::Matrix<double, 6, 6> information;
+	g2o::RobustKernel* robustKernel;
+	EdgeSE3* edgeFromWorld;
+	EdgeSE3* edgeFromVehicle;
+	
+	bool graph_added;
+
+	int reciever_id;
+	
+	double timestamp;
+
+  /** Fix type: 0 means no fix, 1 means 2D fix, 2 means 3D fix, 3 means RTK-float, 4 means RTK-fix */
+    int  fix_type;
+    
+    double longitude;
+    double latitude;
+    double altitude;
+    
+    float accuracy_2d;
+    float accuracy_3d;
+    
+    int idInGNSSVertices;
+	int idxInAllEdges;
+};
 
 
 
@@ -93,13 +188,13 @@ public:
 
 	/** Constructs an empty pose graph. */
 	KeyFrameGraph();
-	
+
 	/** Deletes the g2o graph. */
 	~KeyFrameGraph();
-	
+
 	/** Adds a new KeyFrame to the graph. */
 	void addKeyFrame(Frame* frame);
-	
+
 	/** Adds a new Frame to the graph. Doesnt actually keep the frame, but only it's pose-struct. */
 	void addFrame(Frame* frame);
 
@@ -107,27 +202,28 @@ public:
 
 	/**
 	 * Adds a new constraint to the graph.
-	 * 
+	 *
 	 * The transformation must map world points such that they move as if
 	 * attached to a frame which moves from firstFrame to secondFrame:
 	 * second->camToWorld * first->worldToCam * point
-	 * 
+	 *
 	 * If isOdometryConstraint is set, scaleInformation is ignored.
 	 */
 	void insertConstraint(KFConstraintStruct* constraint);
+        void insertConstraint(GNSSConstraintStruct* constraint);
+        void insertConstraintOfVehicle2Anntena();
 
-	
 	/** Optimizes the graph. Does not update the keyframe poses,
 	 *  only the vertex poses. You must call updateKeyFramePoses() afterwards. */
 	int optimize(int num_iterations);
 	bool addElementsFromBuffer();
 
-	
+
 	/**
 	 * Creates a hash map of keyframe -> distance to given frame.
 	 */
 	void calculateGraphDistancesToFrame(Frame* frame, std::unordered_map<Frame*, int>* distanceMap);
-	
+
 
 
 	int totalPoints;
@@ -155,7 +251,9 @@ public:
 
 	// contains ALL edges, as soon as they are created
 	boost::shared_mutex edgesListsMutex;
+	boost::shared_mutex GNSSedgesListsMutex;
 	std::vector< KFConstraintStruct*, Eigen::aligned_allocator<KFConstraintStruct*> > edgesAll;
+	std::vector< GNSSConstraintStruct*, Eigen::aligned_allocator<GNSSConstraintStruct*> > GNSSedgesAll;
 
 
 
@@ -178,9 +276,10 @@ private:
 
 	/** Pose graph representation in g2o */
 	g2o::SparseOptimizer graph;
-	
+
 	std::vector< Frame*, Eigen::aligned_allocator<Frame*> > newKeyframesBuffer;
 	std::vector< KFConstraintStruct*, Eigen::aligned_allocator<FramePoseStruct*> > newEdgeBuffer;
+	std::vector< GNSSConstraintStruct*, Eigen::aligned_allocator<GNSSConstraintStruct*> > newGNSSEdgeBuffer;
 
 
 	int nextEdgeId;

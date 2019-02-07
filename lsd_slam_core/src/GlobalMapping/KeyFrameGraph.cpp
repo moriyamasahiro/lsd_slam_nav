@@ -2,7 +2,7 @@
 * This file is part of LSD-SLAM.
 *
 * Copyright 2013 Jakob Engel <engelj at in dot tum dot de> (Technical University of Munich)
-* For more information see <http://vision.in.tum.de/lsdslam> 
+* For more information see <http://vision.in.tum.de/lsdslam>
 *
 * LSD-SLAM is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@
 
 #include "opencv2/opencv.hpp"
 
-#include <g2o/types/sim3/sim3.h>
+//#include <g2o/types/se3/se3.h>
 #include "GlobalMapping/g2oTypeSim3Sophus.h"
 
 
@@ -76,8 +76,8 @@ KeyFrameGraph::KeyFrameGraph()
         g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg(
             g2o::make_unique<BalBlockSolver>(std::move(linearSolver)));
         graph.setAlgorithm(algorithm);*/
-	
-        typedef g2o::BlockSolver_7_3 BlockSolver;
+
+        typedef g2o::BlockSolver_6_3 BlockSolver;
         typedef g2o::LinearSolverCSparse<BlockSolver::PoseMatrixType> LinearSolver;
         //typedef g2o::LinearSolverPCG<BlockSolver::PoseMatrixType> LinearSolver;
         LinearSolver* solver = new LinearSolver();
@@ -85,7 +85,7 @@ KeyFrameGraph::KeyFrameGraph()
         g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg(blockSolver);
         graph.setAlgorithm(algorithm);
 
-	
+
         graph.setVerbose(false); // printOptimizationInfo
 	//linearSolver->setWriteDebug(true);
 	//blockSolver->setWriteDebug(true);
@@ -95,6 +95,7 @@ KeyFrameGraph::KeyFrameGraph()
 	totalPoints=0;
 	totalEdges=0;
 	totalVertices=0;
+	
 
 
 }
@@ -250,10 +251,10 @@ void KeyFrameGraph::addKeyFrame(Frame* frame)
 		return;
 
 	// Insert vertex into g2o graph
-	VertexSim3* vertex = new VertexSim3();
+	VertexSE3* vertex = new VertexSE3();
 	vertex->setId(frame->id());
 
-	Sophus::Sim3d camToWorld_estimate = frame->getScaledCamToWorld();
+	Sophus::SE3d camToWorld_estimate = frame->getCamToWorld();
 
 	if(!frame->hasTrackingParent())
 		vertex->setFixed(true);
@@ -269,7 +270,7 @@ void KeyFrameGraph::addKeyFrame(Frame* frame)
 
 void KeyFrameGraph::insertConstraint(KFConstraintStruct* constraint)
 {
-	EdgeSim3* edge = new EdgeSim3();
+	EdgeSE3* edge = new EdgeSE3();
 	edge->setId(nextEdgeId);
 	++ nextEdgeId;
 
@@ -305,6 +306,70 @@ void KeyFrameGraph::insertConstraint(KFConstraintStruct* constraint)
 	edgesListsMutex.unlock();
 }
 
+void KeyFrameGraph::insertConstraint(GNSSConstraintStruct* constraint)
+{
+	EdgeSE3* edge = new EdgeSE3();
+	edge->setId(nextEdgeId);
+	++ nextEdgeId;
+
+	totalEdges++;
+
+	edge->setMeasurement(constraint->vehicleToWorld);
+	edge->setInformation(constraint->information);
+	edge->setRobustKernel(constraint->robustKernel);
+
+	edge->resize(2);
+	assert(constraint->worldVertex != nullptr);
+	edge->setVertex(0, constraint->worldVertex);
+	assert(constraint->vehicleVertex != nullptr);
+	edge->setVertex(1, constraint->vehicleVertex);
+
+	constraint->edgeFromWorld = edge;
+	newGNSSEdgeBuffer.push_back(constraint);
+
+
+	//constraint->firstFrame->neighbors.insert(constraint->secondFrame);
+	//constraint->secondFrame->neighbors.insert(constraint->firstFrame);
+
+	for(int i=0;i<totalVertices;i++)
+	{
+		//shortestDistancesMap
+	}
+
+
+
+	GNSSedgesListsMutex.lock();
+	constraint->idxInAllEdges = edgesAll.size();
+	GNSSedgesAll.push_back(constraint);
+	GNSSedgesListsMutex.unlock();
+}
+
+void KeyFrameGraph::insertConstraintOfVehicle2Anntena()
+{
+	for (auto edge : newGNSSEdgeBuffer)
+	{
+		double timestamp = edge->timestamp;
+		if(edge->graph_added && keyframesAll[keyframesAll.size()-1]->timestamp() > timestamp)
+		{
+			int counter = 0;
+			double timeDiffNow = 1.0e10;
+			double timeDiffPost = 1.0e10;
+			while(true)
+			{
+				timeDiffPost = timeDiffNow;
+				timeDiffNow = abs(timestamp -keyframesAll[keyframesAll.size()-1 - counter]->timestamp()); 
+			    if (timeDiffPost<timeDiffNow)
+			    {
+					edge->edgeFromVehicle->setVertex(1, keyframesAll[keyframesAll.size()-1]->pose->graphVertex);
+					break;
+				}
+			}
+		    graph.addEdge(edge->edgeFromWorld);
+		    edge->graph_added = true;
+		}
+	}
+}
+
 
 bool KeyFrameGraph::addElementsFromBuffer()
 {
@@ -330,6 +395,16 @@ bool KeyFrameGraph::addElementsFromBuffer()
 		added = true;
 	}
 	newEdgeBuffer.clear();
+		
+	for (auto edge : newGNSSEdgeBuffer)
+	{
+		if(!edge->graph_added)
+		{
+		    graph.addEdge(edge->edgeFromWorld);
+		    added = true;
+		    edge->graph_added = true;
+		}
+	}
 
 	return added;
 }
@@ -339,10 +414,10 @@ int KeyFrameGraph::optimize(int num_iterations)
 	// Abort if graph is empty, g2o shows an error otherwise
 	if (graph.edges().size() == 0)
 		return 0;
-	
+
 	graph.setVerbose(false); // printOptimizationInfo
 	graph.initializeOptimization();
-	
+
 
 	return graph.optimize(num_iterations, false);
 
@@ -353,7 +428,7 @@ int KeyFrameGraph::optimize(int num_iterations)
 void KeyFrameGraph::calculateGraphDistancesToFrame(Frame* startFrame, std::unordered_map< Frame*, int >* distanceMap)
 {
 	distanceMap->insert(std::make_pair(startFrame, 0));
-	
+
 	std::multimap< int, Frame* > priorityQueue;
 	priorityQueue.insert(std::make_pair(0, startFrame));
 	while (! priorityQueue.empty())
@@ -362,21 +437,21 @@ void KeyFrameGraph::calculateGraphDistancesToFrame(Frame* startFrame, std::unord
 		int length = it->first;
 		Frame* frame = it->second;
 		priorityQueue.erase(it);
-		
+
 		auto mapEntry = distanceMap->find(frame);
-		
+
 		if (mapEntry != distanceMap->end() && length > mapEntry->second)
 		{
 			continue;
 		}
-		
+
 		for (Frame* neighbor : frame->neighbors)
 		{
 			auto neighborMapEntry = distanceMap->find(neighbor);
-			
+
 			if (neighborMapEntry != distanceMap->end() && length + 1 >= neighborMapEntry->second)
 				continue;
-			
+
 			if (neighborMapEntry != distanceMap->end())
 				neighborMapEntry->second = length + 1;
 			else

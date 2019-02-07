@@ -2,7 +2,7 @@
 * This file is part of LSD-SLAM.
 *
 * Copyright 2013 Jakob Engel <engelj at in dot tum dot de> (Technical University of Munich)
-* For more information see <http://vision.in.tum.de/lsdslam> 
+* For more information see <http://vision.in.tum.de/lsdslam>
 *
 * LSD-SLAM is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@
 #include "IOWrapper/ImageDisplay.h"
 #include "IOWrapper/Output3DWrapper.h"
 #include "IOWrapper/InputImageStream.h"
+#include "IOWrapper/InputGNSSStream.h"
 #include "util/globalFuncs.h"
 
 #include <iostream>
@@ -35,12 +36,14 @@ namespace lsd_slam
 {
 
 
-LiveSLAMWrapper::LiveSLAMWrapper(InputImageStream* imageStream, Output3DWrapper* outputWrapper)
+LiveSLAMWrapper::LiveSLAMWrapper(InputImageStream* imageStream, InputGNSSStream* GNSSStream, Output3DWrapper* outputWrapper)
 {
 	this->imageStream = imageStream;
+	this->GNSSStream = GNSSStream;
 	this->outputWrapper = outputWrapper;
 	imageStream->getBuffer()->setReceiver(this);
-
+	GNSSStream->getBuffer()->setReceiver(this);
+	
 	fx = imageStream->fx();
 	fy = imageStream->fy();
 	cx = imageStream->cx();
@@ -61,7 +64,7 @@ LiveSLAMWrapper::LiveSLAMWrapper(InputImageStream* imageStream, Output3DWrapper*
 
 
 	// make Odometry
-	monoOdometry = new SlamSystem(width, height, K_sophus, doSlam);
+	monoOdometry = new SlamSystem(width, height, K_sophus, this->GNSSStream, doSlam);
 
 	monoOdometry->setVisualization(outputWrapper);
 
@@ -89,8 +92,8 @@ void LiveSLAMWrapper::Loop()
 			notifyCondition.wait(waitLock);
 		}
 		waitLock.unlock();
-		
-		
+
+
 		if(fullResetRequested)
 		{
 			resetAll();
@@ -98,13 +101,16 @@ void LiveSLAMWrapper::Loop()
 			if (!(imageStream->getBuffer()->size() > 0))
 				continue;
 		}
-		
-		TimestampedMat image = imageStream->getBuffer()->first();
-		imageStream->getBuffer()->popFront();
-		
+
+		//my_edition: I think there are duplicate processing.
+		//TimestampedMat image = imageStream->getBuffer()->first();
+		//imageStream->getBuffer()->popFront();
+
+		TimestampedMat data = imageStream->getBuffer()->popFront();
 		// process image
 		//Util::displayImage("MyVideo", image.data);
-		newImageCallback(image.data, image.timestamp);
+		//newImageCallback(data.img, data.timestamp);
+		newImageCallback(data.img, data.depth, data.timestamp);
 	}
 }
 
@@ -119,7 +125,7 @@ void LiveSLAMWrapper::newImageCallback(const cv::Mat& img, Timestamp imgTime)
 		grayImg = img;
 	else
 		cvtColor(img, grayImg, CV_RGB2GRAY);
-	
+
 
 	// Assert that we work with 8 bit images
 	assert(grayImg.elemSize() == 1);
@@ -135,6 +141,41 @@ void LiveSLAMWrapper::newImageCallback(const cv::Mat& img, Timestamp imgTime)
 	else if(isInitialized && monoOdometry != nullptr)
 	{
 		monoOdometry->trackFrame(grayImg.data,imageSeqNumber,false,imgTime.toSec());
+	}
+}
+
+void LiveSLAMWrapper::newImageCallback(const cv::Mat& img, const cv::Matx<float,352,640>& depth, Timestamp imgTime)
+{
+	++ imageSeqNumber;
+
+	// Convert image to grayscale, if necessary
+	cv::Mat grayImg;
+	cv::Matx<float,352,640> Depth;
+
+	if (img.channels() == 1)
+		grayImg = img;
+	else
+		cvtColor(img, grayImg, CV_RGB2GRAY);
+
+	Depth = depth;
+
+
+	// Assert that we work with 8 bit images
+	assert(grayImg.elemSize() == 1);
+	assert(fx != 0 || fy != 0);
+
+
+	// need to initialize
+	if(!isInitialized)
+	{
+		monoOdometry->stereoDepthInit(grayImg.data, Depth.val, imgTime.toSec(), 1);
+		//monoOdometry->randomInit(grayImg.data, imgTime.toSec(), 1);
+		isInitialized = true;
+	}
+	else if(isInitialized && monoOdometry != nullptr)
+	{
+		monoOdometry->trackFrame(grayImg.data, Depth.val,imageSeqNumber,false,imgTime.toSec());
+		//monoOdometry->trackFrame(grayImg.data,imageSeqNumber,false,imgTime.toSec());
 	}
 }
 
@@ -175,7 +216,7 @@ void LiveSLAMWrapper::resetAll()
 
 		Sophus::Matrix3f K;
 		K << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
-		monoOdometry = new SlamSystem(width,height,K, doSlam);
+		monoOdometry = new SlamSystem(width,height,K,  this->GNSSStream, doSlam);
 		monoOdometry->setVisualization(outputWrapper);
 
 	}

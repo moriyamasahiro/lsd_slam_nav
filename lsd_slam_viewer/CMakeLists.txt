@@ -22,6 +22,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   roslib
   cmake_modules
+  roslang
 )
 
 find_package(OpenGL REQUIRED)

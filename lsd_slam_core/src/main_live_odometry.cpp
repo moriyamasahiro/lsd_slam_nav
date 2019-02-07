@@ -27,6 +27,7 @@
 
 
 #include "IOWrapper/ROS/ROSImageStreamThread.h"
+#include "IOWrapper/ROS/ROSGNSSStreamThread.h"
 #include "IOWrapper/ROS/ROSOutput3DWrapper.h"
 #include "IOWrapper/ROS/rosReconfigure.h"
 
@@ -48,6 +49,7 @@ int main( int argc, char** argv )
 	packagePath = ros::package::getPath("lsd_slam_core")+"/";
 
 	InputImageStream* inputStream = new ROSImageStreamThread();
+	InputGNSSStream* inputGNSSStream = new ROSGNSSStreamThread();
 
 	std::string calibFile;
 	if(ros::param::get("~calib", calibFile))
@@ -57,10 +59,11 @@ int main( int argc, char** argv )
 	}
 	else
 		inputStream->setCalibration("");
-	inputStream->run();
+	//inputStream->run();
+	inputGNSSStream->run();
 
 	Output3DWrapper* outputWrapper = new ROSOutput3DWrapper(inputStream->width(), inputStream->height());
-	LiveSLAMWrapper slamNode(inputStream, outputWrapper);
+	LiveSLAMWrapper slamNode(inputStream, inputGNSSStream, outputWrapper);
 	slamNode.Loop();
 
 

@@ -79,6 +79,7 @@ public:
 	cv::Mat debugImageDepth;
 
 	void initializeFromGTDepth(Frame* new_frame);
+	void initializeFromStereoDepth(Frame* new_frame);
 	void initializeRandomly(Frame* new_frame);
 
 	void setFromExistingKF(Frame* kf);
@@ -138,6 +139,7 @@ private:
 
 
 	void propagateDepth(Frame* new_keyframe);
+        void propagateDepth_2(Frame* new_keyframe);
 	
 
 	void observeDepth();

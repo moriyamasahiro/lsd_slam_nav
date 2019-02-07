@@ -31,6 +31,10 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <geometry_msgs/PoseStamped.h>
 
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
+
 #include "util/Undistorter.h"
 
 
@@ -62,6 +66,7 @@ public:
 	
 	// get called on ros-message callbacks
 	void vidCb(const sensor_msgs::ImageConstPtr img);
+	void vidCb(const sensor_msgs::ImageConstPtr img, const sensor_msgs::ImageConstPtr depth);
 	void infoCb(const sensor_msgs::CameraInfoConstPtr info);
 
 private:
@@ -73,6 +78,15 @@ private:
 
 	std::string vid_channel;
 	ros::Subscriber vid_sub;
+	
+	message_filters::Subscriber<sensor_msgs::Image> img_sub;
+        message_filters::Subscriber<sensor_msgs::Image> depth_sub;
+    
+    
+        typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> VidSyncPolicy;
+        typedef message_filters::Synchronizer<VidSyncPolicy> Sync;
+
+        boost::shared_ptr<Sync> vid_sync;
 
 	int lastSEQ;
 };

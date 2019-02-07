@@ -18,40 +18,55 @@
 * along with LSD-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef _TIME_STAMPED_OBJECT_HPP_
-#define _TIME_STAMPED_OBJECT_HPP_
+#pragma once
 
-#include <chrono>
+#include "IOWrapper/NotifyBuffer.h"
+#include "IOWrapper/TimestampedObject.h"
+#include "IOWrapper/InputGNSSStream.h"
 
-#include <opencv2/core/core.hpp>
+#include <ros/ros.h>
+#include <ros/package.h>
+#include "sensor_msgs/NavSatFix.h"
+#include <geometry_msgs/PoseStamped.h>
 
-#include "IOWrapper/Timestamp.h"
+
+#include "util/Undistorter.h"
 
 
 namespace lsd_slam
 {
 
-template<typename T, typename U>
-struct TimestampedObject
+
+
+/**
+ * Image stream provider using ROS messages.
+ */
+class ROSGNSSStreamThread : public InputGNSSStream
 {
-	T img;
-    U depth;
-	Timestamp timestamp;
-};
+public:
+	ROSGNSSStreamThread();
+	~ROSGNSSStreamThread();
 
-typedef TimestampedObject< cv::Mat, cv::Matx<float, 352, 640> > TimestampedMat;
+	/**
+	 * Starts the thread.
+	 */
+	void run();
 
-struct TimestampedGNSS
-{
-    /* The positioning data from gnss recievers, which contains longitude, latitude, altitude.*/
-    double positioning[3];
-    /* The variance positioning data from gnss recievers.*/
-    double variance[3];
-    /* The positioning status*/
-    int status;
+	/**
+	 * Thread main function.
+	 */
+	void operator()();
 
-	Timestamp timestamp;
+	// get called on ros-message callbacks
+	void gnssCb(const sensor_msgs::NavSatFixConstPtr &gnss);
+
+private:
+	ros::NodeHandle nh_;
+
+	std::string gnss_channel;
+	ros::Subscriber gnss_sub;
+
+	int lastSEQ;
 };
 
 }
-#endif

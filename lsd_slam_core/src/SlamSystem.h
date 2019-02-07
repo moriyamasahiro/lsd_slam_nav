@@ -2,7 +2,7 @@
 * This file is part of LSD-SLAM.
 *
 * Copyright 2013 Jakob Engel <engelj at in dot tum dot de> (Technical University of Munich)
-* For more information see <http://vision.in.tum.de/lsdslam> 
+* For more information see <http://vision.in.tum.de/lsdslam>
 *
 * LSD-SLAM is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -20,14 +20,19 @@
 
 #pragma once
 #include <vector>
+#include <iostream>
+#include <fstream>
+#include <chrono>
 #include <boost/thread.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
 #include "util/settings.h"
-#include "IOWrapper/Timestamp.h"
 #include "opencv2/core/core.hpp"
 
+#include "IOWrapper/Timestamp.h"
+#include "IOWrapper/NotifyBuffer.h"
+#include "IOWrapper/TimestampedObject.h"
 #include "util/SophusUtil.h"
 
 #include "Tracking/Relocalizer.h"
@@ -40,7 +45,7 @@ namespace lsd_slam
 class TrackingReference;
 class KeyFrameGraph;
 class SE3Tracker;
-class Sim3Tracker;
+class SE3KFTracker;
 class DepthMap;
 class Frame;
 class DataSet;
@@ -48,6 +53,7 @@ class LiveSLAMWrapper;
 class Output3DWrapper;
 class TrackableKeyFrameSearch;
 class FramePoseStruct;
+class InputGNSSStream;
 struct KFConstraintStruct;
 
 
@@ -63,11 +69,13 @@ public:
 	int width;
 	int height;
 	Eigen::Matrix3f K;
+	InputGNSSStream* GNSSStream;
 	const bool SLAMEnabled;
 
 	bool trackingIsGood;
 
 
+	SlamSystem(int w, int h, Eigen::Matrix3f K, InputGNSSStream* GNSSStream, bool enableSLAM = true);
 	SlamSystem(int w, int h, Eigen::Matrix3f K, bool enableSLAM = true);
 	SlamSystem(const SlamSystem&) = delete;
 	SlamSystem& operator=(const SlamSystem&) = delete;
@@ -75,14 +83,16 @@ public:
 
 	void randomInit(uchar* image, double timeStamp, int id);
 	void gtDepthInit(uchar* image, float* depth, double timeStamp, int id);
-
-	
+	void stereoDepthInit(uchar* image, unsigned int* depth, double timeStamp, int id);
+    void stereoDepthInit(uchar* image, float* depth, double timeStamp, int id);
 
 	// tracks a frame.
 	// first frame will return Identity = camToWord.
 	// returns camToWord transformation of the tracked frame.
 	// frameID needs to be monotonically increasing.
 	void trackFrame(uchar* image, unsigned int frameID, bool blockUntilMapped, double timestamp);
+	void trackFrame(uchar* image, unsigned int* depth, unsigned int frameID, bool blockUntilMapped, double timestamp);
+    void trackFrame(uchar* image, float* depth, unsigned int frameID, bool blockUntilMapped, double timestamp);
 
 	// finalizes the system, i.e. blocks and does all remaining loop-closures etc.
 	void finalize();
@@ -103,11 +113,11 @@ public:
 	bool doMappingIteration();
 
 	int findConstraintsForNewKeyFrames(Frame* newKeyFrame, bool forceParent=true, bool useFABMAP=true, float closeCandidatesTH=1.0);
-	
+
 	bool optimizationIteration(int itsPerTry, float minChange);
-	
+
 	void publishKeyframeGraph();
-	
+
 	std::vector<FramePoseStruct*, Eigen::aligned_allocator<lsd_slam::FramePoseStruct*> > getAllPoses();
 
 
@@ -139,7 +149,7 @@ private:
 
 	// ============= EXCLUSIVELY FIND-CONSTRAINT THREAD (+ init) =============
 	TrackableKeyFrameSearch* trackableKeyFrameSearch;
-	Sim3Tracker* constraintTracker;
+	SE3KFTracker* constraintTracker;
 	SE3Tracker* constraintSE3Tracker;
 	TrackingReference* newKFTrackingReference;
 	TrackingReference* candidateTrackingReference;
@@ -207,10 +217,11 @@ private:
 	bool keepRunning; // used only on destruction to signal threads to finish.
 
 
-	
+
 	// optimization thread
 	bool newConstraintAdded;
-	boost::mutex newConstraintMutex;
+	bool newGNSSConstraintAdded;
+    boost::mutex newConstraintMutex;
 	boost::condition_variable newConstraintCreatedSignal;
 	boost::mutex g2oGraphAccessMutex;
 
@@ -223,16 +234,21 @@ private:
 	// GUARANTEED to give the same result each call, and to be compatible to each other.
 	// locked exclusively during the pose-update by Mapping.
 	boost::shared_mutex poseConsistencyMutex;
-	
-	
+
+
 
 	bool depthMapScreenshotFlag;
 	std::string depthMapScreenshotFilename;
-
+	
+	/** my_edition **/
+	boost::condition notifyCondition;
+	inline void notify() {
+		notifyCondition.notify_all();
+	}
 
 	/** Merges the current keyframe optimization offset to all working entities. */
 	void mergeOptimizationOffset();
-	
+
 
 	void mappingThreadLoop();
 
@@ -253,24 +269,25 @@ private:
 	void takeRelocalizeResult();
 
 	void constraintSearchThreadLoop();
+	void GNSSInsertionThreadLoop();
 	/** Calculates a scale independent error norm for reciprocal tracking results a and b with associated information matrices. */
 	float tryTrackSim3(
 			TrackingReference* A, TrackingReference* B,
 			int lvlStart, int lvlEnd,
 			bool useSSE,
-			Sim3 &AtoB, Sim3 &BtoA,
+			SE3 &AtoB, SE3 &BtoA,
 			KFConstraintStruct* e1=0, KFConstraintStruct* e2=0);
 
 	void testConstraint(
 			Frame* candidate,
 			KFConstraintStruct* &e1_out, KFConstraintStruct* &e2_out,
-			Sim3 candidateToFrame_initialEstimate,
+			SE3 candidateToFrame_initialEstimate,
 			float strictness);
 
 	void optimizationThreadLoop();
 
 
-	
+
 };
 
 }

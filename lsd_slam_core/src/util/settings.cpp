@@ -50,7 +50,7 @@ bool printLineStereoFails = false;
 
 bool printTrackingIterationInfo = false;
 
-bool printFrameBuildDebugInfo = false;
+bool printFrameBuildDebugInfo = true;
 bool printMemoryDebugInfo = false;
 
 bool printKeyframeSelectionInfo = false;
@@ -64,8 +64,8 @@ bool printOverallTiming = false;
 
 bool plotTrackingIterationInfo = false;
 bool plotSim3TrackingIterationInfo = false;
-bool plotStereoImages = false;
-bool plotTracking = false;
+bool plotStereoImages = true;
+bool plotTracking = true;
 
 
 float freeDebugParam1 = 1;
@@ -74,10 +74,10 @@ float freeDebugParam3 = 1;
 float freeDebugParam4 = 1;
 float freeDebugParam5 = 1;
 
-float KFDistWeight = 4;
+float KFDistWeight = 1;
 float KFUsageWeight = 3;
 
-float minUseGrad = 5;
+float minUseGrad = 3;
 float cameraPixelNoise2 = 4*4;
 float depthSmoothingFactor = 1;
 
@@ -89,12 +89,12 @@ bool useAffineLightningEstimation = true;
 
 
 
-bool useFabMap = false;
+bool useFabMap = true;
 bool doSlam = true;
 bool doKFReActivation = true;
 bool doMapping = true;
 
-int maxLoopClosureCandidates = 10;
+int maxLoopClosureCandidates = 15;
 int maxOptimizationIterations = 100;
 int propagateKeyFrameDepthCount = 0;
 float loopclosureStrictness = 1.5;
@@ -107,7 +107,8 @@ bool saveLoopClosureImages =  false;
 bool saveAllTrackingStages = false;
 bool saveAllTrackingStagesInternal = false;
 
-bool continuousPCOutput = false;
+//edit here
+bool continuousPCOutput = true;
 
 
 bool fullResetRequested = false;

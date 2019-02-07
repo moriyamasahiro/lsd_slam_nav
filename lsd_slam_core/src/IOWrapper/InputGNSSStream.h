@@ -18,40 +18,37 @@
 * along with LSD-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef _TIME_STAMPED_OBJECT_HPP_
-#define _TIME_STAMPED_OBJECT_HPP_
+#pragma once
 
-#include <chrono>
+#include "IOWrapper/NotifyBuffer.h"
+#include "IOWrapper/TimestampedObject.h"
 
-#include <opencv2/core/core.hpp>
-
-#include "IOWrapper/Timestamp.h"
 
 
 namespace lsd_slam
 {
 
-template<typename T, typename U>
-struct TimestampedObject
+/**
+ * Virtual ImageStream. Can be from OpenCV's ImageCapture, ROS or Android.
+ * Also has to provide the camera calibration for that stream, as well as the respective undistorter object (if required).
+ * Runs in it's own thread, and has a NotifyBuffer, in which received images are stored.
+ */
+class InputGNSSStream
 {
-	T img;
-    U depth;
-	Timestamp timestamp;
+public:
+	virtual ~InputGNSSStream() {};
+
+	/**
+	 * Starts the thread.
+	 */
+	virtual void run() {};
+
+	/**
+	 * Gets the NotifyBuffer to which incoming images are stored.
+	 */
+	inline NotifyBuffer<TimestampedGNSS>* getBuffer() {return gnssBuffer;};
+
+protected:
+	NotifyBuffer<TimestampedGNSS>* gnssBuffer;
 };
-
-typedef TimestampedObject< cv::Mat, cv::Matx<float, 352, 640> > TimestampedMat;
-
-struct TimestampedGNSS
-{
-    /* The positioning data from gnss recievers, which contains longitude, latitude, altitude.*/
-    double positioning[3];
-    /* The variance positioning data from gnss recievers.*/
-    double variance[3];
-    /* The positioning status*/
-    int status;
-
-	Timestamp timestamp;
-};
-
 }
-#endif

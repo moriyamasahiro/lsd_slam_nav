@@ -51,8 +51,8 @@ namespace lsd_slam
 
 // validity can take values between 0 and X, where X depends on the abs. gradient at that location:
 // it is calculated as VALIDITY_COUNTER_MAX + (absGrad/255)*VALIDITY_COUNTER_MAX_VARIABLE
-#define VALIDITY_COUNTER_MAX (5.0f)		// validity will never be higher than this
-#define VALIDITY_COUNTER_MAX_VARIABLE (250.0f)		// validity will never be higher than this
+#define VALIDITY_COUNTER_MAX (10.0f)		// validity will never be higher than this
+#define VALIDITY_COUNTER_MAX_VARIABLE (100.0f)		// validity will never be higher than this
 
 #define VALIDITY_COUNTER_INC 5		// validity is increased by this on sucessfull stereo
 #define VALIDITY_COUNTER_DEC 5		// validity is decreased by this on failed stereo
@@ -71,11 +71,11 @@ namespace lsd_slam
 /** ============== Depth Variance Handeling ======================= */
 #define SUCC_VAR_INC_FAC (1.01f) // before an ekf-update, the variance is increased by this factor.
 #define FAIL_VAR_INC_FAC 1.1f // after a failed stereo observation, the variance is increased by this factor.
-#define MAX_VAR (0.5f*0.5f) // initial variance on creation - if variance becomes larter than this, hypothesis is removed.
+#define MAX_VAR (10.0f*10.0f) // initial variance on creation - if variance becomes larter than this, hypothesis is removed.
 
 #define VAR_GT_INIT_INITIAL 0.01f*0.01f	// initial variance vor Ground Truth Initialization
 #define VAR_RANDOM_INIT_INITIAL (0.5f*MAX_VAR)	// initial variance vor Random Initialization
-
+#define VAR_STEREO_SCALE_INIT_INITIAL (0.01f)	// initial variance vor stereo Initialization
 
 
 
